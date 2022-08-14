@@ -24,7 +24,7 @@ def login():
 
 def get_general_manpower():
     """ Returning a dataframe of workers based on google sheets file with workers names and their emails."""
-    gc = gs.service_account(filename='service_account_seetree.json')
+    gc = gs.service_account(filename='services\service_account_seetree.json')
     sh = gc.open_by_url('https://docs.google.com/spreadsheets/d/1N7FCFnOKoQvKTqPgI1RCEOW5j8pVpZI9LDWiuoxlnkc/edit#gid=2118451581')
     ws = sh.worksheet('Team info - Ops Team')
     workers = pd.DataFrame(ws.get_all_records())
@@ -213,7 +213,7 @@ def get_jql_tickets(jql, jira_user):
 def get_general_filters():
     """ Returning a dataframe of filters based on google sheets file with teams and their Jira filter number. """
 
-    gc = gs.service_account(filename='service_account_seetree.json')
+    gc = gs.service_account(filename='services\service_account_seetree.json')
     sh = gc.open_by_url('https://docs.google.com/spreadsheets/d/1N7FCFnOKoQvKTqPgI1RCEOW5j8pVpZI9LDWiuoxlnkc/edit#gid=2118451581')
     ws = sh.worksheet('Teams Filters')
     filters = pd.DataFrame(ws.get_all_records())
@@ -265,21 +265,19 @@ def assignee_oldest_ticket(min_worker, jira_user, team_filter_jql):
 
 
 def main():
-    jira_user = login()
-    workers = get_general_manpower()
-    team = team_selector(workers)
-    available_workers = absent_people(workers, team)
-    full_available_team_names = get_new_guys(workers, available_workers,team)
-    filters = get_general_filters().set_index("Team")
-    team_filter_id = str(filters.loc[[team]].values[0][0])
-    team_filter_jql = get_jql(team_filter_id, jira_user)
-    metadata_full_available_team = init_full_available_team(full_available_team_names,team, team_filter_jql, jira_user, workers)
-    min_worker = find_least_assignments_man(metadata_full_available_team)
-    assignee_oldest_ticket(min_worker, jira_user, team_filter_jql)
+    jira_user = login() # Login for Jira API
+    workers = get_general_manpower() # Create workers dataframe by matching google sheets file 
+    team = team_selector(workers) # For choosing the relevant team from the workers datadrame
+    available_workers = absent_people(workers, team) # Setting the available manpower for the working day
+    full_available_team_names = get_new_guys(workers, available_workers,team) # Adding guys from other teams in case of a need
+    filters = get_general_filters().set_index("Team") # For getting and ordering the filters numbers dataframe from google sheet
+    team_filter_id = str(filters.loc[[team]].values[0][0]) # For getting the match filterID for the chosen team
+    team_filter_jql = get_jql(team_filter_id, jira_user) # Convert the filterID into jira JQL filter
+    metadata_full_available_team = init_full_available_team(full_available_team_names,team, team_filter_jql, jira_user, workers) # Construct a list with all the relevant team member as Worker objects
     current_time = get_current_time()
     while (current_time >= 9) and (current_time <= 18):
-        min_worker = find_least_assignments_man(metadata_full_available_team)
-        assignee_oldest_ticket(min_worker, jira_user, team_filter_jql)
+        min_worker = find_least_assignments_man(metadata_full_available_team) # Find the current worker with the least amount of Jira tickets
+        assignee_oldest_ticket(min_worker, jira_user, team_filter_jql) # Assignee the ticket with the highest latency to the min_worker
         for sec in range(300):
             sec_left = 300 - sec
             time.sleep(1)
